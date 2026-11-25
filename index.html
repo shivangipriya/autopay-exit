@@ -207,9 +207,27 @@ var AE = (function(){
     return L.join("\n");
   }
 
+  /* Rebuilds a list from untrusted text (import or stored data): plain strings only, capped lengths, fresh unique ids. */
+  function str(v, max){ return v === undefined || v === null || typeof v === "object" ? "" : String(v).slice(0, max); }
+  function normalise(d){
+    if(!d || typeof d !== "object" || !Array.isArray(d.mandates)) throw new Error("no mandate list");
+    var out = [], n = 0;
+    d.mandates.slice(0, 200).forEach(function(m){
+      if(!m || typeof m !== "object") return;
+      var name = str(m.name, 300).trim();
+      if(!name) return;
+      n++;
+      var atts = (Array.isArray(m.attempts) ? m.attempts : []).slice(0, 200).filter(function(a){ return a && typeof a === "object"; }).map(function(a){
+        n++;
+        return { id: "a" + n, date: str(a.date, 10), route: str(a.route, 200), result: str(a.result, 500), ref: str(a.ref, 200) };
+      });
+      out.push({ id: "m" + (++n), name: name, amount: str(m.amount, 20), freq: str(m.freq, 20), app: str(m.app, 200), since: str(m.since, 10), status: validStatus(m.status), attempts: atts });
+    });
+    return { mandates: out, nextId: n + 1 };
+  }
   function fresh(){ return { mandates: [] }; }
   return { LS_KEY:LS_KEY, STATUSES:STATUSES, blank:blank, validStatus:validStatus, inr:inr, num:num, fmtDate:fmtDate,
-           encode:encode, decode:decode, monthlyBurn:monthlyBurn, summaryText:summaryText, fresh:fresh };
+           encode:encode, decode:decode, normalise:normalise, monthlyBurn:monthlyBurn, summaryText:summaryText, fresh:fresh };
 })();
 
 (function(){
@@ -230,7 +248,7 @@ var AE = (function(){
       var raw = localStorage.getItem(AE.LS_KEY);
       if(raw){
         var d = JSON.parse(raw);
-        if(d && d.mandates){ data = d; data.mandates.forEach(function(m){ m.status = AE.validStatus(m.status); }); el("remember").checked = true; el("iomsg").textContent = "Restored this browser's saved list."; }
+        if(d && d.mandates){ var nd = AE.normalise(d); data = { mandates: nd.mandates }; uid = nd.nextId; el("remember").checked = true; el("iomsg").textContent = "Restored this browser's saved list."; }
       }
     } catch(e){ /* corrupt storage - start clean, never crash */ }
   }
@@ -305,6 +323,8 @@ var AE = (function(){
     var t = e.target;
     if(!t.hasAttribute) return;
     if(t.hasAttribute("data-del")){
+      var dm = data.mandates.find(function(x){ return x.id === t.getAttribute("data-del"); });
+      if(dm && !window.confirm("Remove \"" + dm.name + "\" and its attempt log from this list?")) return;
       data.mandates = data.mandates.filter(function(x){ return x.id !== t.getAttribute("data-del"); });
       render(); persist(); renderSummary();
     }
@@ -362,8 +382,8 @@ var AE = (function(){
     var box = el("io");
     if(box.style.display === "none" || !box.value.trim()){ box.style.display = "block"; box.value = ""; box.focus(); el("iomsg").textContent = "Paste an earlier export here, then press Import text again."; return; }
     try {
-      data = AE.decode(box.value);
-      data.mandates.forEach(function(m){ m.status = AE.validStatus(m.status); m.attempts = m.attempts || []; });
+      var nd = AE.normalise(AE.decode(box.value));
+      data = { mandates: nd.mandates }; uid = nd.nextId;
       render(); renderSummary();
       if(el("remember").checked) persist();
       el("iomsg").textContent = "Imported.";
