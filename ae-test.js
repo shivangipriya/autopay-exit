@@ -86,5 +86,20 @@ ok(html.indexOf("Stopping the money") < html.indexOf("Route 1"), "contract warni
 ok(/cannot be cancelled through the UPI app/.test(html) && /loan repayment/.test(html), "non-revocable mandate caveat present");
 ok(/at least 24 hours before a debit/.test(html) && /2-3 days before/.test(html), "timing caveat present");
 
+// normalise: untrusted import / storage
+var bad = AE.normalise({ mandates: [ { id: 'x" onfocus="alert(1)', name: "<img src=x onerror=alert(1)>", status: "Hacked", freq: {a:1}, amount: 649, attempts: [ { id: 'q"', result: "ok", date: "2026-11-01" }, null, 5 ] }, null, { name: "  " }, { name: "Keep", status: "Active" } ] });
+eq(bad.mandates.length, 2, "normalise drops empty and non-object rows");
+ok(/^m\d+$/.test(bad.mandates[0].id) && /^a\d+$/.test(bad.mandates[0].attempts[0].id), "normalise replaces ids with safe ones");
+eq(bad.mandates[0].status, "Unsure", "normalise coerces unknown status");
+eq(bad.mandates[0].freq, "", "normalise drops object-valued fields");
+eq(bad.mandates[0].amount, "649", "normalise stringifies numbers");
+eq(bad.mandates[0].attempts.length, 1, "normalise drops non-object attempts");
+var ids = []; bad.mandates.forEach(function(m){ ids.push(m.id); m.attempts.forEach(function(a){ ids.push(a.id); }); });
+eq(new Set(ids).size, ids.length, "normalise ids are unique");
+ok(bad.nextId > Math.max.apply(null, ids.map(function(i){ return Number(i.slice(1)); })), "nextId above every id");
+var threwN = 0; [null, 5, {}, { mandates: "x" }].forEach(function(v){ try { AE.normalise(v); } catch(e){ threwN++; } });
+eq(threwN, 4, "normalise rejects non-lists");
+eq(AE.normalise({ mandates: [ { name: "A".repeat(500) } ] }).mandates[0].name.length, 300, "normalise caps name length");
+ok(/window\.confirm/.test(html), "remove asks for confirmation");
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
