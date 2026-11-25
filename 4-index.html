@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autopay Exit - find, cancel and track your UPI mandates</title>
+<style>
+  :root{ --bg:#f6f7f9; --ink:#1a1d24; --mut:#5b6472; --accent:#0d6e63; --card:#ffffff; --line:#e3e6ec; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; line-height:1.55; }
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 16px 64px; }
+  h1{ font-size:1.5rem; margin:0 0 6px; }
+  h2{ font-size:1.1rem; margin:0 0 10px; }
+  h3{ font-size:0.95rem; margin:18px 0 6px; }
+  .sub{ color:var(--mut); margin:0 0 20px; font-size:0.95rem; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+  .hint{ font-size:0.8rem; color:var(--mut); margin-top:4px; }
+  label{ display:block; font-weight:600; font-size:0.88rem; margin:12px 0 4px; }
+  input[type=text],input[type=number],input[type=date],textarea,select{ width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-size:0.95rem; font-family:inherit; background:#fff; }
+  textarea{ min-height:56px; resize:vertical; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:560px){ .grid2{ grid-template-columns:1fr; } }
+  button{ font-family:inherit; }
+  button.primary{ width:100%; margin-top:14px; padding:12px; background:var(--accent); color:#fff; border:0; border-radius:10px; font-size:0.98rem; font-weight:600; cursor:pointer; }
+  button.primary:hover{ filter:brightness(1.08); }
+  button.ghost{ background:none; border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:0.82rem; color:var(--mut); cursor:pointer; }
+  button.ghost.danger{ color:#a33; border-color:#e5c4c4; }
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .tabs button{ flex:1; min-width:110px; padding:10px 6px; border:1px solid var(--line); background:var(--card); border-radius:10px; font-size:0.88rem; font-weight:600; color:var(--mut); cursor:pointer; }
+  .tabs button.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .note{ background:#eef6f4; border:1px solid #cfe7e2; border-radius:8px; padding:10px 12px; font-size:0.85rem; color:#175e54; margin-top:12px; }
+  .warn{ background:#fdf6ec; border:1px solid #f0dfc0; border-radius:8px; padding:10px 12px; font-size:0.85rem; color:#6b4e16; margin-top:10px; }
+  .limits{ font-size:0.85rem; color:var(--mut); border-top:1px dashed var(--line); padding-top:14px; }
+  footer{ margin-top:26px; font-size:0.8rem; color:var(--mut); }
+  .mrow{ border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .mrow-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .mrow-head b{ font-size:0.95rem; }
+  .pill{ display:inline-block; font-size:0.75rem; border:1px solid var(--line); border-radius:999px; padding:2px 10px; color:var(--mut); }
+  .pill.active{ color:#175e54; border-color:#cfe7e2; background:#eef6f4; }
+  .pill.done{ color:var(--mut); text-decoration:none; }
+  .attempt{ font-size:0.85rem; color:var(--mut); border-top:1px dashed var(--line); padding:6px 0 0; margin-top:8px; }
+  .src{ font-size:0.78rem; color:var(--mut); margin-top:6px; }
+  .src a{ color:var(--accent); word-break:break-all; }
+  .savebar{ display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; margin-top:12px; }
+  .savebar label{ display:flex; gap:8px; align-items:flex-start; font-weight:500; margin:0; }
+  .savebar input{ margin-top:3px; width:auto; }
+  .sum{ width:100%; min-height:200px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:0.82rem; background:#fbfcfd; }
+  button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Autopay Exit</h1>
+  <p class="sub">Subscriptions and loans quietly pull money through UPI AutoPay mandates. Keep your mandates in one list, follow the documented exit path for each, and track every attempt until the status reads cancelled. This page organises and explains - it cannot cancel anything for you, and no cancellation is guaranteed by anything here.</p>
+
+  <div class="tabs" role="tablist">
+    <button id="tabList" class="on" role="tab" aria-selected="true" aria-controls="paneList">My mandates</button>
+    <button id="tabHow" role="tab" aria-selected="false" aria-controls="paneHow">The exit path</button>
+    <button id="tabSum" role="tab" aria-selected="false" aria-controls="paneSum">Summary</button>
+  </div>
+
+  <div id="paneList" role="tabpanel" aria-labelledby="tabList">
+    <div class="card">
+      <h2 id="formTitle">Add a mandate</h2>
+      <label for="mName">Who pulls the money (merchant or app)</label>
+      <input type="text" id="mName" maxlength="120" placeholder="e.g. Netflix, loan app, gym">
+      <div class="grid2">
+        <div><label for="mAmount">Amount per debit (&#8377;)</label><input type="number" id="mAmount" min="0" placeholder="649"></div>
+        <div><label for="mFreq">How often</label><select id="mFreq"><option value="">-</option><option>Monthly</option><option>Quarterly</option><option>Yearly</option><option>Weekly</option><option>Per use</option><option>Other</option></select></div>
+        <div><label for="mApp">UPI app that holds the mandate</label><select id="mApp"><option value="">-</option><option>Google Pay</option><option>PhonePe</option><option>Paytm</option><option>BHIM</option><option>Other / not sure</option></select></div>
+        <div><label for="mSince">Running since (if known)</label><input type="date" id="mSince"></div>
+      </div>
+      <button class="primary" id="addMandate">Add to my list</button>
+    <div class="hint" id="addMsg" role="status" style="color:#a33"></div>
+      <button class="ghost" id="cancelEdit" style="display:none;margin-top:8px">Cancel editing</button>
+      <div class="hint">Any field left blank simply stays out - nothing is assumed.</div>
+    </div>
+    <div id="mandates"></div>
+  </div>
+
+  <div id="paneHow" role="tabpanel" aria-labelledby="tabHow" style="display:none">
+    <div class="card">
+      <h2>How a UPI AutoPay mandate actually ends</h2>
+      <div class="warn"><b>Stopping the money is not ending the agreement behind it.</b> Revoking a mandate stops the automatic pull - it does not cancel what the payments were for. A subscription you no longer want still needs cancelling with the merchant, or dues can pile up. A loan EMI is different: a loan cannot simply be ended - tell the lender and agree how you will repay instead, because a missed EMI can mean late fees, penal interest and a credit-score hit. And check timing before you rely on a revocation: if a debit date is close, confirm with the app or bank when the stop actually takes effect.</div>
+      <h3>Route 1 - inside the UPI app that created it</h3>
+      <p style="font-size:0.92rem;margin:6px 0">Open the UPI app where the mandate was created, go to <b>Profile or Settings &rarr; AutoPay / Mandates / Subscriptions</b>, open the active mandate, tap <b>Cancel or Revoke</b>, and confirm - usually with your <b>UPI PIN</b> (RBI's rules require an extra authentication step at revocation). NPCI confirms that modify, revoke, pause and unpause are standard features inside UPI apps.</p>
+      <div class="src">Sources: <a href="https://www.npci.org.in/product/autopay" rel="noopener">npci.org.in/product/autopay</a> and HDFC Bank's mandate-cancellation guide <a href="https://www.hdfc.bank.in/payments/services/cancel-upi-autopay-mandate" rel="noopener">hdfc.bank.in/payments/services/cancel-upi-autopay-mandate</a> - both read 23 Nov 2026 and re-checked 25 Nov 2026.</div>
+      <div class="warn"><b>Not every mandate can be stopped in the app.</b> HDFC Bank's guide says that, as per the regulator, mandates for some merchants (for example debt collection and loan repayment) cannot be cancelled through the UPI app, and you should contact the merchant or lender directly. If the Cancel option is missing or greyed out, that is the likely reason - use Route 2 or Route 3 and do not assume the payment has stopped.</div>
+      <div class="warn"><b>Timing:</b> NPCI says customers get a pre-debit notification at least 24 hours before a debit, and HDFC Bank suggests cancelling at least 2-3 days before the next scheduled payment. A revocation made just before a debit date may not stop that debit - check the status afterwards and keep your proof.</div>
+      <div class="warn"><b>Honest limit:</b> menu names and screens differ between apps and change over time. These are the general documented steps, not screenshots of your exact app version. If you cannot find the mandate, look for "Autopay", "Mandates", "Subscriptions" or "UPI Mandate" under your profile.</div>
+      <h3>Route 2 - from the merchant's side</h3>
+      <p style="font-size:0.92rem;margin:6px 0">Some mandates can also be cancelled on the merchant's own app or website (for example, ending the subscription itself). After doing that, <b>open your UPI app and check that the mandate status shows Cancelled or Revoked</b> - ending a subscription does not always end the payment mandate behind it.</p>
+      <div class="src">Source: HDFC Bank guide, read 23 Nov 2026 (same link as above).</div>
+      <h3>Route 3 - through your bank</h3>
+      <p style="font-size:0.92rem;margin:6px 0">If the app routes fail, contact your bank - its app, net banking, helpline or branch - and <b>ask what mandate-revocation route it offers for your account</b>. RBI's e-mandate rules treat revocation as your action protected by an extra authentication step (AFA), but how each bank lets you exercise that varies, so the honest instruction is to ask them directly rather than follow a generic path. Keep your mandate list and attempt log from this page handy for that conversation.</p>
+      <div class="src">Source: RBI circular on e-mandates in UPI, 10 Jan 2020: <a href="https://www.rbi.org.in/scripts/FS_Notification.aspx?Id=11784" rel="noopener">rbi.org.in/scripts/FS_Notification.aspx?Id=11784</a> - read 23 Nov 2026.</div>
+      <h3>Three money truths</h3>
+      <div class="note"><b>Cancelling stops future debits only.</b> Amounts already debited are not automatically refunded - a refund is a separate ask to the merchant. <b>Pause vs revoke:</b> pause when you will want the mandate back, revoke when you are done. <b>Verify, don't assume:</b> after any cancellation, the mandate's status in the UPI app should read Cancelled or Revoked - a vanished subscription tile is not proof.</div>
+      <div class="src">Sources: HDFC Bank guide and NPCI page linked above, read 23 Nov 2026.</div>
+    </div>
+  </div>
+
+  <div id="paneSum" role="tabpanel" aria-labelledby="tabSum" style="display:none">
+    <div class="card">
+      <h2>Your mandate record, as plain text</h2>
+      <div class="note">Paste this into a note, mail or bank conversation when someone asks what is pulling your money and what you have already tried.</div>
+      <textarea class="sum" id="sumText" readonly aria-label="Mandate record as plain text"></textarea>
+      <button class="primary" id="copySum">Copy record</button>
+      <div class="hint" id="copyMsg"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Keeping this list</h2>
+    <div class="hint">By default this page forgets everything when you close it. If you want it to remember, tick the box - your list stays only in this browser, on this device; the page itself sends nothing anywhere. Export moves a copy out as text under your control, and unticking erases the browser copy.</div>
+    <div class="savebar">
+      <label><input type="checkbox" id="remember"> Remember my list in this browser (only this device; untick to erase)</label>
+      <button class="ghost" id="exportBtn">Export as text</button>
+      <button class="ghost" id="importBtn">Import text</button>
+    </div>
+    <textarea id="io" rows="3" style="display:none;margin-top:10px" placeholder="Your exported text appears here to copy - or paste an earlier export here, then press Import."></textarea>
+    <div class="hint" id="iomsg"></div>
+  </div>
+
+  <div class="card limits">
+    <b>What this page does not do.</b> It does not cancel, pause or modify any mandate - only you can do that, in your app or through your bank. It does not promise that a cancellation will succeed or that money will come back. It is not affiliated with NPCI, RBI, any bank or any UPI app, and its step descriptions are general documented routes, not live views of your accounts. The page itself makes no network requests; what you enter stays on your device unless you export or copy it out yourself.
+  </div>
+  <footer>Maintained by <a href="https://www.linkedin.com/in/shivangii-priyaa" target="_blank" rel="noreferrer">Shivangi Priya</a>.</footer>
+</div>
+
+<script>
+/* Autopay Exit - pure logic kept DOM-free and exported as AE for tests. */
+var AE = (function(){
+  var LS_KEY = "autopay-exit-v1";
+  var STATUSES = ["Active","Cancellation requested","Cancelled / revoked","Unsure"];
+
+  function blank(v){ return v === undefined || v === null || String(v).trim() === ""; }
+  function validStatus(s){ return STATUSES.indexOf(s) > -1 ? s : "Unsure"; }
+
+  function inr(n){
+    if(typeof n !== "number" || !isFinite(n)) return "-";
+    var neg = n < 0; n = Math.abs(Math.round(n));
+    var s = String(n), last3 = s.slice(-3), rest = s.slice(0, -3);
+    var grouped = rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3 : last3;
+    return (neg ? "-" : "") + "\u20B9" + grouped;
+  }
+  function num(v){
+    if(blank(v)) return null;
+    var n = Number(v);
+    return isFinite(n) && n >= 0 ? n : null;
+  }
+  function fmtDate(d){
+    if(blank(d)) return null;
+    var p = String(d).split("-");
+    if(p.length !== 3) return String(d);
+    var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    var m = parseInt(p[1],10);
+    if(m < 1 || m > 12) return String(d);
+    return parseInt(p[2],10) + " " + months[m-1] + " " + p[0];
+  }
+
+  function encode(state){ return btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
+  function decode(txt){
+    var obj = JSON.parse(decodeURIComponent(escape(atob(String(txt).trim()))));
+    if(!obj || typeof obj !== "object" || obj.app !== "autopay-exit") throw new Error("not an Autopay Exit export");
+    return obj.data;
+  }
+
+  /* Monthly-equivalent burn for known amounts; per-use and unknowns excluded, never guessed. */
+  function monthlyBurn(mandates){
+    var total = 0, counted = 0;
+    (mandates||[]).forEach(function(m){
+      if(m.status === "Cancelled / revoked") return;
+      var n = num(m.amount);
+      if(n === null || blank(m.freq)) return;
+      var f = m.freq;
+      var per = null;
+      if(f === "Monthly") per = n;
+      else if(f === "Quarterly") per = n/3;
+      else if(f === "Yearly") per = n/12;
+      else if(f === "Weekly") per = n*52/12;
+      if(per !== null){ total += per; counted++; }
+    });
+    return { total: total, counted: counted };
+  }
+
+  function summaryText(d){
+    var L = [];
+    var ms = d.mandates || [];
+    L.push("UPI AUTOPAY MANDATE RECORD");
+    if(!ms.length){ L.push("No mandates recorded."); }
+    ms.forEach(function(m){
+      var bits = [];
+      var n = num(m.amount);
+      bits.push(n !== null ? inr(n) : "amount not recorded");
+      if(!blank(m.freq)) bits.push(m.freq.toLowerCase());
+      if(!blank(m.app)) bits.push("via " + m.app);
+      if(!blank(m.since)) bits.push("since " + fmtDate(m.since));
+      L.push("- " + m.name + ": " + bits.join(", ") + " [" + m.status + "]");
+      (m.attempts||[]).forEach(function(a){
+        L.push("    " + (fmtDate(a.date) || "no date") + " - tried " + a.route + ": " + a.result + (blank(a.ref) ? "" : " (proof: " + a.ref + ")"));
+      });
+    });
+    var b = monthlyBurn(ms);
+    if(b.counted > 0) L.push("Approx monthly pull across " + b.counted + " known mandate(s): " + inr(Math.round(b.total)) + " (per-use and unknown amounts excluded).");
+    L.push("Organised with Autopay Exit - a record-keeping page. Only you can cancel a mandate, in your app or through your bank.");
+    return L.join("\n");
+  }
+
+  /* Rebuilds a list from untrusted text (import or stored data): plain strings only, capped lengths, fresh unique ids. */
+  function str(v, max){ return v === undefined || v === null || typeof v === "object" ? "" : String(v).slice(0, max); }
+  function normalise(d){
+    if(!d || typeof d !== "object" || !Array.isArray(d.mandates)) throw new Error("no mandate list");
+    var out = [], n = 0;
+    d.mandates.slice(0, 200).forEach(function(m){
+      if(!m || typeof m !== "object") return;
+      var name = str(m.name, 300).trim();
+      if(!name) return;
+      n++;
+      var atts = (Array.isArray(m.attempts) ? m.attempts : []).slice(0, 200).filter(function(a){ return a && typeof a === "object"; }).map(function(a){
+        n++;
+        return { id: "a" + n, date: str(a.date, 10), route: str(a.route, 200), result: str(a.result, 500), ref: str(a.ref, 200) };
+      });
+      out.push({ id: "m" + (++n), name: name, amount: str(m.amount, 20), freq: str(m.freq, 20), app: str(m.app, 200), since: str(m.since, 10), status: validStatus(m.status), attempts: atts });
+    });
+    return { mandates: out, nextId: n + 1 };
+  }
+  function fresh(){ return { mandates: [] }; }
+  return { LS_KEY:LS_KEY, STATUSES:STATUSES, blank:blank, validStatus:validStatus, inr:inr, num:num, fmtDate:fmtDate,
+           encode:encode, decode:decode, normalise:normalise, monthlyBurn:monthlyBurn, summaryText:summaryText, fresh:fresh };
+})();
+
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  var data = AE.fresh();
+  var uid = 1;
+  var editing = null;
+
+  function persist(){
+    if(!el("remember").checked) return true;
+    try { localStorage.setItem(AE.LS_KEY, JSON.stringify(data)); return true; }
+    catch(e){ el("iomsg").textContent = "Could not save in this browser (storage unavailable or full). Export a text copy instead."; return false; }
+  }
+  function load(){
+    try {
+      var raw = localStorage.getItem(AE.LS_KEY);
+      if(raw){
+        var d = JSON.parse(raw);
+        if(d && d.mandates){ var nd = AE.normalise(d); data = { mandates: nd.mandates }; uid = nd.nextId; el("remember").checked = true; el("iomsg").textContent = "Restored this browser's saved list."; }
+      }
+    } catch(e){ /* corrupt storage - start clean, never crash */ }
+  }
+
+  function statusPill(s){
+    return '<span class="pill' + (s === "Active" ? " active" : "") + '">' + esc(s) + "</span>";
+  }
+  function render(){
+    var host = el("mandates");
+    if(!data.mandates.length){
+      host.innerHTML = '<div class="card"><div class="hint">No mandates yet. Add the first one above - checking your UPI app\'s AutoPay section will show you what is live.</div></div>';
+      return;
+    }
+    host.innerHTML = data.mandates.map(function(m){
+      var n = AE.num(m.amount);
+      var bits = [];
+      bits.push(n !== null ? AE.inr(n) : "amount not recorded");
+      if(!AE.blank(m.freq)) bits.push(esc(m.freq));
+      if(!AE.blank(m.app)) bits.push("via " + esc(m.app));
+      if(!AE.blank(m.since)) bits.push("since " + esc(AE.fmtDate(m.since)));
+      var attempts = (m.attempts||[]).map(function(a){
+        return '<div class="attempt">' + esc(AE.fmtDate(a.date) || "no date") + " - tried " + esc(a.route) + ": " + esc(a.result) + (AE.blank(a.ref) ? "" : ' <span class="pill">proof: ' + esc(a.ref) + "</span>") + "</div>";
+      }).join("");
+      var statusOpts = AE.STATUSES.map(function(s){ return '<option' + (s === m.status ? " selected" : "") + ">" + s + "</option>"; }).join("");
+      return '<div class="mrow card" style="margin-bottom:12px">' +
+        '<div class="mrow-head"><b>' + esc(m.name) + "</b>" + statusPill(m.status) + "</div>" +
+        '<div class="hint">' + bits.join(" &middot; ") + "</div>" + attempts +
+        '<div class="grid2" style="margin-top:10px">' +
+          '<div><label>Status</label><select data-st="' + m.id + '">' + statusOpts + "</select></div>" +
+          '<div style="display:flex;gap:8px;align-items:flex-end"><button class="ghost" data-edit="' + m.id + '">Edit</button><button class="ghost danger" data-del="' + m.id + '">Remove</button></div>' +
+        "</div>" +
+        '<h3 style="margin-top:12px">Log a cancellation attempt</h3>' +
+        '<div class="grid2">' +
+          '<div><label>Date</label><input type="date" data-adate="' + m.id + '"></div>' +
+          '<div><label>Route tried</label><select data-aroute="' + m.id + '"><option>UPI app - AutoPay/Mandates</option><option>Merchant app or website</option><option>Bank - asked support for their revocation route</option></select></div>' +
+        "</div>" +
+        '<label>What happened</label><input type="text" data-aresult="' + m.id + '" maxlength="200" placeholder="e.g. tapped Revoke, PIN accepted, status shows Revoked">' +
+        '<label>Proof label (optional)</label><input type="text" data-aref="' + m.id + '" maxlength="80" placeholder="e.g. SMS 21 Nov, screenshot in gallery">' +
+        '<button class="ghost" data-addatt="' + m.id + '" style="margin-top:8px">Add attempt</button>' +
+      "</div>";
+    }).join("");
+  }
+  function renderSummary(){ el("sumText").value = AE.summaryText(data); }
+
+  function clearForm(){
+    ["mName","mAmount","mSince"].forEach(function(i){ el(i).value = ""; });
+    el("mFreq").value = ""; el("mApp").value = "";
+    editing = null;
+    el("addMandate").textContent = "Add to my list";
+    el("formTitle").textContent = "Add a mandate";
+    el("cancelEdit").style.display = "none";
+  }
+  function collectForm(){
+    return { name: el("mName").value.trim(), amount: el("mAmount").value, freq: el("mFreq").value, app: el("mApp").value, since: el("mSince").value };
+  }
+
+  el("addMandate").addEventListener("click", function(){
+    var f = collectForm();
+    if(!f.name){ el("addMsg").textContent = "Enter who pulls the money first - that is the only required field."; el("mName").focus(); return; }
+    el("addMsg").textContent = "";
+    if(editing){
+      var m = data.mandates.find(function(x){ return x.id === editing; });
+      if(m){ m.name = f.name; m.amount = f.amount; m.freq = f.freq; m.app = f.app; m.since = f.since; }
+    } else {
+      data.mandates.push({ id:"m"+(uid++), name:f.name, amount:f.amount, freq:f.freq, app:f.app, since:f.since, status:"Active", attempts:[] });
+    }
+    clearForm(); render(); persist(); renderSummary();
+  });
+  el("cancelEdit").addEventListener("click", clearForm);
+
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    if(!t.hasAttribute) return;
+    if(t.hasAttribute("data-del")){
+      var dm = data.mandates.find(function(x){ return x.id === t.getAttribute("data-del"); });
+      if(dm && !window.confirm("Remove \"" + dm.name + "\" and its attempt log from this list?")) return;
+      data.mandates = data.mandates.filter(function(x){ return x.id !== t.getAttribute("data-del"); });
+      render(); persist(); renderSummary();
+    }
+    if(t.hasAttribute("data-edit")){
+      var m = data.mandates.find(function(x){ return x.id === t.getAttribute("data-edit"); });
+      if(m){
+        editing = m.id;
+        el("mName").value = m.name; el("mAmount").value = m.amount; el("mFreq").value = m.freq; el("mApp").value = m.app; el("mSince").value = m.since;
+        el("addMandate").textContent = "Save changes";
+        el("formTitle").textContent = "Edit mandate";
+        el("cancelEdit").style.display = "";
+        el("mName").focus();
+      }
+    }
+    if(t.hasAttribute("data-addatt")){
+      var id = t.getAttribute("data-addatt");
+      var mm = data.mandates.find(function(x){ return x.id === id; });
+      var result = document.querySelector('[data-aresult="' + id + '"]').value.trim();
+      if(!result){ document.querySelector('[data-aresult="' + id + '"]').focus(); return; }
+      mm.attempts = mm.attempts || [];
+      mm.attempts.push({ id:"a"+(uid++), date: document.querySelector('[data-adate="' + id + '"]').value,
+        route: document.querySelector('[data-aroute="' + id + '"]').value, result: result,
+        ref: document.querySelector('[data-aref="' + id + '"]').value.trim() });
+      render(); persist(); renderSummary();
+    }
+  });
+  document.addEventListener("change", function(e){
+    var t = e.target;
+    if(t.hasAttribute && t.hasAttribute("data-st")){
+      var m = data.mandates.find(function(x){ return x.id === t.getAttribute("data-st"); });
+      if(m){ m.status = AE.validStatus(t.value); render(); persist(); renderSummary(); }
+    }
+  });
+
+  el("copySum").addEventListener("click", function(){
+    renderSummary();
+    var txt = el("sumText").value;
+    function done(){ el("copyMsg").textContent = "Copied - paste it anywhere."; }
+    function manual(){ el("sumText").focus(); el("sumText").select(); el("copyMsg").textContent = "Select-all is on - copy it manually (Ctrl/Cmd+C)."; }
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, manual); }
+    else manual();
+  });
+
+  el("remember").addEventListener("change", function(){
+    if(el("remember").checked){ if(persist()) el("iomsg").textContent = "Saved in this browser only. Untick any time to erase."; }
+    else { try { localStorage.removeItem(AE.LS_KEY); } catch(e){} el("iomsg").textContent = "Erased from this browser."; }
+  });
+  el("exportBtn").addEventListener("click", function(){
+    el("io").style.display = "block";
+    el("io").value = AE.encode({ app:"autopay-exit", v:1, data: data });
+    el("io").focus(); el("io").select();
+    el("iomsg").textContent = "Your list as text - copy it and keep it anywhere.";
+  });
+  el("importBtn").addEventListener("click", function(){
+    var box = el("io");
+    if(box.style.display === "none" || !box.value.trim()){ box.style.display = "block"; box.value = ""; box.focus(); el("iomsg").textContent = "Paste an earlier export here, then press Import text again."; return; }
+    try {
+      var nd = AE.normalise(AE.decode(box.value));
+      data = { mandates: nd.mandates }; uid = nd.nextId;
+      render(); renderSummary();
+      if(el("remember").checked) persist();
+      el("iomsg").textContent = "Imported.";
+    } catch(e){ el("iomsg").textContent = "That text is not an Autopay Exit export - nothing was changed."; }
+  });
+
+  ["List","How","Sum"].forEach(function(name){
+    el("tab"+name).addEventListener("click", function(){
+      ["List","How","Sum"].forEach(function(n){
+        el("tab"+n).classList.toggle("on", n===name);
+        el("tab"+n).setAttribute("aria-selected", n===name ? "true" : "false");
+        el("pane"+n).style.display = n===name ? "" : "none";
+      });
+      renderSummary();
+    });
+  });
+
+  load();
+  render();
+  renderSummary();
+})();
+</script>
+</body>
+</html>
